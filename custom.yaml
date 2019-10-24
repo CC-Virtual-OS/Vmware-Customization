@@ -1,0 +1,50 @@
+---
+
+- name: Customization Playbook
+  hosts: localhost
+  vars:
+    deploy: "{{ lookup('file', 'json/data.json') }}"  
+  gather_facts: false
+  tasks:
+
+
+#     - debug:
+#         var:  deploy[0] | json_query("Network[?(@.Scope=='Management')].IP") 
+
+
+     - name: Parsing Management address
+       set_fact:
+         mg: "{{ deploy[0] | json_query('Network[?(@.Scope==`Management`)].IP') }}"
+
+
+     - name: Parsing Production address
+       set_fact:
+         pr: "{{ deploy[0] | json_query('Network[?(@.Scope==`Production`)].IP') }}"
+
+
+     - name: Checking Management NIC 
+       set_fact:
+         tmphost: "{{ mg[0] }}"
+       when: mg|length > 0
+
+
+     - name: Checking Aliases on Production NIC
+       set_fact: 
+         tmphost: "{{ pr[0].split(',')[0] }}"
+       when:
+         - mg|length == 0
+         - pr[0] > 1
+
+
+     - debug:
+         var: tmphost
+
+
+     - name: Adding host to inventory
+       add_host:
+         hostname: "{{ tmphost }}"
+         groups: just_parsed
+
+
+- import_playbook: files/clear.yaml
+- import_playbook: files/network.yaml

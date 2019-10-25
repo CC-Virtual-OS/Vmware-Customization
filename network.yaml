@@ -6,9 +6,98 @@
     ansible_ssh_pass: C4mb14m1!
     ansible_become_pass: C4mb14m1!
     data: "{{ lookup('file', '../json/data.json') }}"
-  gather_facts: false
+  gather_facts: true
   tasks:
 
 
+#   - debug:
+#       var:  deploy[0] | json_query("Network[?(@.Scope=='Management')].IP") 
+
+
+    - set_fact:
+       mgi: "{{ data[0] | json_query('Network[?(@.Scope==`Management`)].IP') }}"
+
+
+    - set_fact:
+       mgimac: "{{ data[0] | json_query('Network[?(@.Scope==`Management`)].MAC') }}"
+      when: mgi|length > 0
+
+
+    - set_fact:
+       mgimask: "{{ data[0] | json_query('Network[?(@.Scope==`Management`)].MASK') }}"
+       when: mgi|length > 0
+
+
+    - set_fact:
+       pri: "{{ data[0] | json_query('Network[?(@.Scope==`Production`)].IP') }}"
+
+
+    - set_fact:
+       primac: "{{ data[0] | json_query('Network[?(@.Scope==`Production`)].MAC') }}"
+
+
+    - set_fact: 
+       nfsi: "{{ data[0] | json_query('Network[?(@.Scope==`NFS`)].IP') }}"
+
+
+    - set_fact:
+       nfsmac: "{{ data[0] | json_query('Network[?(@.Scope==`NFS`)].MAC') }}"
+      when: nfsi|length > 0
+
+
+    - set_fact: 
+       bei: "{{ data[0] | json_query('Network[?(@.Scope==`BE`)].IP') }}"
+
+
+    - set_fact:
+       beimac: "{{ data[0] | json_query('Network[?(@.Scope==`BE`)].MAC') }}"
+      when: bei|length > 0
+
+
+    - set_fact: 
+       bkpi: "{{ data[0] | json_query('Network[?(@.Scope==`Backup`)].IP') }}"
+
+
+    - set_fact:
+       bkpmac: "{{ data[0] | json_query('Network[?(@.Scope==`Backup`)].MAC') }}"
+      when: bkpi|length > 0
+
+
+    - name: Setting Hostname
+      hostname:
+        name: "{{ data[0].Hostname }}"
+      become: true
+      become_method: sudo
+
+
+#    - set_fact:
+#        mgmt_interface: "{{ item }}"
+#      when: >
+#        (hostvars[inventory_hostname]['ansible_%s' % item]|default({}))
+#        .get('macaddress') == "{{ mgimac[0] }}" 
+#      with_items: "{{ ansible_interfaces }}"
+
+    - name: Getting management network properties
+      set_fact:
+        mgmt_interface: "{{ item }}"
+      when:
+        - (hostvars[inventory_hostname]['ansible_%s' % item]|default({})).get('macaddress') == "{{ mgimac[0] }}" 
+        - mgi|length > 0 
+      with_items: "{{ ansible_interfaces }}"
+
+
+    - set_fact:  
+        nmclimgmask: "{{ mgi[0] + / + mgimac[0] | ipaddr('prefix') }}"
+
+
     - debug:
-        msg: GG
+        msg: Valgo "{{ '192.168.111.10/255.255.255.0' | ipaddr('prefix') }}"
+      delegate_to: localhost
+
+
+
+#    - name: Configuring management network
+#      nmcli: 
+#        conn_name: "{{ mgmt_interface }}"-prova
+#        type: ethernet
+#

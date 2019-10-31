@@ -48,5 +48,3 @@
 
 #- import_playbook: files/clear.yaml
 - import_playbook: files/network.yaml
-
-

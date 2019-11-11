@@ -1,0 +1,150 @@
+---
+- name: "Phase 1 : Cleaning Operations"
+  hosts: just_parsed
+  vars:
+    ansible_ssh_user: administrator
+    ansible_ssh_pass: C4mb14m1!
+    ansible_become_pass: C4mb14m1!
+    data: "{{ lookup('file', '../data/data.json') }}"
+  gather_facts: false
+  tasks:
+
+
+    - name: Blanking /etc/hosts file
+      shell: echo "127.0.0.1 localhost localhost.localdomain localhost4 localhost4.localdomain4" > /etc/hosts
+      become: true
+      become_method: sudo
+
+
+    - name: Checking any existing route file
+      find:
+        paths: /etc/sysconfig/network-scripts
+        patterns: route*
+      register: routes_to_delete
+
+
+    - name: Removing any existing route file
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ routes_to_delete.files }}"
+      become: true
+      become_method: sudo
+      when: routes_to_delete|length > 0
+
+
+    - name: Checking any existing NIC file
+      find:
+        paths: /etc/sysconfig/network-scripts
+        patterns: ifcfg-e*
+      register: ifcfg_to_delete
+
+
+    - name: Removing any existing NIC file
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ ifcfg_to_delete.files }}"
+      become: true
+      become_method: sudo
+      when: ifcfg_to_delete|length > 0
+
+
+    - name: Blanking DNS file
+      shell: "> /etc/resolv.conf"
+      become: true
+      become_method: sudo
+
+
+    - name: Checking administrator history
+      find:
+        paths: /home/administrator
+        patterns: "*history*"
+        hidden: yes
+      register: adminhistory_to_delete
+
+
+    - name: Clearing administrator history
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ adminhistory_to_delete.files }}"
+      when: adminhistory_to_delete|length > 0
+
+
+    - name: Checking root history
+      find:
+        paths: /root
+        patterns: "*history*"
+        hidden: yes
+      register: roothistory_to_delete
+      become: true
+      become_method: sudo
+
+
+    - name: Clearing root history
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ roothistory_to_delete.files }}"
+      become: true
+      become_method: sudo
+      when: roothistory_to_delete|length > 0
+
+
+    - name: Checking /var/log files
+      find:
+        paths: /var/log
+        patterns: 
+          - message*
+          - cron* 
+          - boot* 
+          - secure*
+          - btmp*
+      register: log_to_delete
+      become: true
+      become_method: sudo
+
+
+    - name: Stopping system logs
+      service:
+        name: rsyslog
+        state: stopped
+      become: true
+      become_method: sudo
+
+
+    - name: Clearing /var/log files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ log_to_delete.files }}"
+      become: true
+      become_method: sudo
+
+
+    - name: Creating /var/log files
+      file: 
+        path: "{{ item }}"
+        state: touch
+        owner: root
+        group: root
+        mode: '0600'
+      with_items:
+        - /var/log/boot.log
+        - /var/log/btmp
+        - /var/log/cron
+        - /var/log/messages
+        - /var/log/secure
+      become: true
+      become_method: sudo
+
+
+    - name: Starting system logs
+      service:
+        name: rsyslog
+        state: started
+      become: true
+      become_method: sudo
+
+

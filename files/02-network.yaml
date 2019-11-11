@@ -1,0 +1,364 @@
+---
+- name: "Phase 2 : Network Configuration"
+  hosts: just_parsed
+  vars:
+    ansible_ssh_user: administrator
+    ansible_ssh_pass: C4mb14m1!
+    ansible_become_pass: C4mb14m1!
+    data: "{{ lookup('file', '../data/data.json') }}"
+  gather_facts: true
+  tasks:
+
+
+#   - debug:
+#       var:  deploy[0] | json_query("Network[?(@.Scope=='Management')].IP") 
+
+
+
+    - name: Checking network manager status
+      service:
+        name: NetworkManager
+        state: started
+      become: true
+      become_method: sudo
+
+
+    - set_fact:
+        mgi: "{{ data[0] | json_query('Network[?(@.Scope==`Management`)].IP') }}"
+
+
+    - set_fact:
+        mgimac: "{{ data[0] | json_query('Network[?(@.Scope==`Management`)].MAC') }}"
+      when: mgi|length > 0
+
+
+    - set_fact:
+        mgimask: "{{ data[0] | json_query('Network[?(@.Scope==`Management`)].MASK') }}"
+      when: mgi|length > 0
+
+
+    - set_fact:
+        pri: "{{ data[0] | json_query('Network[?(@.Scope==`Production`)].IP') }}"
+
+
+    - set_fact:
+        aliaslt: "{{ pri[0].split(',')|length }}"
+
+
+    - set_fact:
+        alias: "{{ pri[0].split(',')[1] }}"
+      when:  "{{ aliaslt|int > 1 }}"
+
+
+    - set_fact:
+        erog: "{{ pri[0].split(',')[0] }}"
+
+
+    - set_fact:
+       primac: "{{ data[0] | json_query('Network[?(@.Scope==`Production`)].MAC') }}"
+      when: pri|length > 0
+
+
+    - set_fact:
+       primask: "{{ data[0] | json_query('Network[?(@.Scope==`Production`)].MASK') }}"
+      when: pri|length > 0
+
+
+    - set_fact: 
+       nfsi: "{{ data[0] | json_query('Network[?(@.Scope==`NFS`)].IP') }}"
+
+
+    - set_fact:
+       nfsimac: "{{ data[0] | json_query('Network[?(@.Scope==`NFS`)].MAC') }}"
+      when: nfsi|length > 0
+
+
+    - set_fact:
+       nfsimask: "{{ data[0] | json_query('Network[?(@.Scope==`NFS`)].MASK') }}"
+      when: nfsi|length > 0
+
+
+    - set_fact: 
+       bei: "{{ data[0] | json_query('Network[?(@.Scope==`BE`)].IP') }}"
+
+
+    - set_fact:
+       beimac: "{{ data[0] | json_query('Network[?(@.Scope==`BE`)].MAC') }}"
+      when: bei|length > 0
+
+
+    - set_fact:
+       beimask: "{{ data[0] | json_query('Network[?(@.Scope==`BE`)].MASK') }}"
+      when: bei|length > 0
+
+
+    - set_fact: 
+       bkpi: "{{ data[0] | json_query('Network[?(@.Scope==`Backup`)].IP') }}"
+
+
+    - set_fact:
+       bkpimac: "{{ data[0] | json_query('Network[?(@.Scope==`Backup`)].MAC') }}"
+      when: bkpi|length > 0
+
+
+    - set_fact:
+       bkpimask: "{{ data[0] | json_query('Network[?(@.Scope==`Backup`)].MASK') }}"
+      when: bkpi|length > 0
+
+
+    - name: Setting Hostname
+      hostname:
+        name: "{{ data[0].Hostname }}"
+      become: true
+      become_method: sudo
+
+
+
+###  BACKUP
+#    - set_fact:
+#        mgmt_interface: "{{ item }}"
+#      when: >
+#        (hostvars[inventory_hostname]['ansible_%s' % item]|default({}))
+#        .get('macaddress') == "{{ mgimac[0] }}" 
+#      with_items: "{{ ansible_interfaces }}"
+### END BACKUP
+
+# BUONO DA QUI
+#
+
+      #Production
+    - name: Getting PRODUCTION network properties
+      set_fact:
+        pr_interface: "{{ item }}"
+      when:
+        - (hostvars[inventory_hostname]['ansible_%s' % item]|default({})).get('macaddress') == "{{ primac[0] }}" 
+        - pri|length > 0 
+      with_items: "{{ ansible_interfaces }}"
+      ignore_errors: true
+
+
+    - set_fact:
+        prtmp: "{{ erog + '/' + primask[0] }}"  
+      when: 
+        - pri|length > 0
+        - pr_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - set_fact:  
+        nmcliprmask: "{{ prtmp | ipaddr('prefix') }}"
+      when: 
+        - pri|length > 0
+        - pr_interface is defined
+
+
+      # Management 
+    - name: Getting MANAGEMENT network properties
+      set_fact:
+        mg_interface: "{{ item }}"
+      when:
+        - (hostvars[inventory_hostname]['ansible_%s' % item]|default({})).get('macaddress') == "{{ mgimac[0] }}" 
+        - mgi|length > 0 
+      with_items: "{{ ansible_interfaces }}"
+      ignore_errors: true
+
+
+    - set_fact:
+        mgtmp: "{{ mgi[0] + '/' + mgimask[0] }}"  
+      when: 
+        - mgi|length > 0
+        - mg_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - set_fact:  
+        nmclimgmask: "{{ mgtmp | ipaddr('prefix') }}"
+      when: 
+        - mgi|length > 0
+        - mg_interface is defined
+
+
+      # NFS 
+    - name: Getting NFS network properties
+      set_fact:
+        nfs_interface: "{{ item }}"
+      when:
+        - (hostvars[inventory_hostname]['ansible_%s' % item]|default({})).get('macaddress') == "{{ nfsimac[0] }}" 
+        - nfsi|length > 0 
+      with_items: "{{ ansible_interfaces }}"
+      ignore_errors: true
+
+
+    - set_fact:
+        nfstmp: "{{ nfsi[0] + '/' + nfsimask[0] }}"  
+      when: 
+        - nfsi|length > 0
+        - nfs_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - set_fact:  
+        nmclinfsmask: "{{ nfstmp | ipaddr('prefix') }}"
+      when:
+        - nfsi|length > 0
+        - nfs_interface is defined
+
+
+      # BE 
+    - name: Getting BE network properties
+      set_fact:
+        be_interface: "{{ item }}"
+      when:
+        - (hostvars[inventory_hostname]['ansible_%s' % item]|default({})).get('macaddress') == "{{ beimac[0] }}" 
+        - bei|length > 0 
+      with_items: "{{ ansible_interfaces }}"
+      ignore_errors: true
+
+
+    - set_fact:
+        betmp: "{{ bei[0] + '/' + beimask[0] }}"  
+      when: 
+        - bei|length > 0
+        - be_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - set_fact:  
+        nmclibemask: "{{ betmp | ipaddr('prefix') }}"
+      when: 
+        - bei|length > 0
+        - be_interface is defined
+
+
+      # BCK 
+    - name: Getting BCK network properties
+      set_fact:
+        bkp_interface: "{{ item }}"
+      when:
+        - (hostvars[inventory_hostname]['ansible_%s' % item]|default({})).get('macaddress') == "{{ bkpimac[0] }}" 
+        - bkpi|length > 0 
+      with_items: "{{ ansible_interfaces }}"
+      ignore_errors: true
+
+
+    - set_fact:
+        bkptmp: "{{ bkpi[0] + '/' + bkpimask[0] }}"  
+      when: 
+         - bkpi|length > 0
+         - bkp_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - set_fact:  
+        nmclibkpmask: "{{ bkptmp | ipaddr('prefix') }}"
+      when: 
+        - bkpi|length > 0
+        - bkp_interface is defined
+
+#  TEST CON MODULO NMCLI
+#
+#    - name: Configuring production network
+#      nmcli: 
+#        conn_name: "{{ pr_interface + '-SERVICE'}}" 
+#        type: ethernet
+#        ifname: "{{ pr_interface }}"
+#        ip4: "{{ pri[0] + '/' + nmcliprmask }}"
+#        gw4: "{{ data[0].Gateway }}"
+#        state: present
+#      when: pri|length > 0
+#      become: true
+#      become_method: sudo
+
+
+    - name: Checking PRODUCTION network configuration 
+      template:
+        src: ../config/ifcfg-pr.j2
+        dest: "/etc/sysconfig/network-scripts/ifcfg-{{ pr_interface + '-SERVICE' }}"
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      become_method: sudo
+      when: 
+        - pri|length > 0
+        - pr_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+    
+    - name: Checking MANAGEMENT network configuration
+      template:
+        src: ../config/ifcfg-mgmt.j2
+        dest: "/etc/sysconfig/network-scripts/ifcfg-{{ mg_interface + '-MGMT' }}"
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      become_method: sudo
+      when:
+        - mgi|length > 0
+        - mg_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - name: Checking NFS network configuration
+      template:
+        src: ../config/ifcfg-nfs.j2
+        dest: "/etc/sysconfig/network-scripts/ifcfg-{{ nfs_interface + '-NFS' }}"
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      become_method: sudo
+      when: 
+        - nfsi|length > 0
+        - nfs_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - name: Checking BE network configuration
+      template:
+        src: ../config/ifcfg-be.j2
+        dest: "/etc/sysconfig/network-scripts/ifcfg-{{ be_interface + '-BE' }}"
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      become_method: sudo
+      when: 
+        - bei|length > 0
+        - be_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - name: Checking BKP network configuration
+      template:
+        src: ../config/ifcfg-bkp.j2
+        dest: "/etc/sysconfig/network-scripts/ifcfg-{{ be_interface + '-BKP' }}"
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      become_method: sudo
+      when: 
+        - bkpi|length > 0
+        - bkp_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - name: Restarting NetworkManager service
+      service:
+        name: NetworkManager
+        state: restarted
+      become: true
+      become_method: sudo
+
+
+    - name: Loading Production Aliases
+      command: |
+        nmcli connection reload "{{ pr_interface + '-SERVICE' }}"
+        nmcli connection up "{{ pr_interface + '-SERVICE' }}"
+      become: true
+      become_method: sudo
+      when: alias is defined
+
+
+    - name: Updating /etc/hosts file
+      template: 
+        src: ../config/hosts.j2
+        dest: "/etc/hosts"
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      become_method: sudo
+ 

@@ -1,0 +1,40 @@
+---
+- name: "Phase 3 : Services Configuration"
+  hosts: just_parsed
+  vars:
+    ansible_ssh_user: administrator
+    ansible_ssh_pass: C4mb14m1!
+    ansible_become_pass: C4mb14m1!
+    data: "{{ lookup('file', '../data/data.json') }}"
+  gather_facts: true
+  tasks:
+    
+
+    - name: Copying SSH banner file
+      template:
+        src: ../config/ssh-banner.j2
+        dest: /etc/ssh/sshd-banner
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      become_method: sudo
+
+
+    - name: Updating SSH configuration
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^Banner'
+        line: 'Banner=/etc/ssh/sshd-banner'
+      register: banner_modified
+      become: true
+      become_method: sudo
+
+
+    - name: Restarting SSH
+      service:
+        name: sshd
+        state: restarted
+      when: banner_modified.changed
+
+

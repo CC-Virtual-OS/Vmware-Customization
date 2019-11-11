@@ -1,0 +1,25 @@
+
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+{{ erog }} {{ data[0].Hostname }}-service {{ data[0].Hostname }}
+{% if mg_interface is defined %}
+{{ mgi[0] }} {{ data[0].Hostname }}-mgmt
+{% endif %}
+{% if nfs_interface is defined %}
+{{ nfsi[0] }} {{ data[0].Hostname }}-nfs
+{% endif %}
+{% if be_interface is defined %}
+{{ bei[0] }} {{ data[0].Hostname }}-be
+{% endif %}
+{% if bkp_interface is defined %}
+{{ bkpi[0] }} {{ data[0].Hostname }}-bck
+{% endif %}
+
+10.75.148.1      smtp.lottomatica.ltm  mailhost mailhost.
+172.26.48.45     QRadar
+10.4.13.6        QRadarReplay
+172.26.48.45     gk-syslog-server
+
+
+##########BEGIN LTM DBA##########
+##########END LTM DBA##########
+

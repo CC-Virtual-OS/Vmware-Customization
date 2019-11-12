@@ -10,11 +10,6 @@
   tasks:
 
 
-#   - debug:
-#       var:  deploy[0] | json_query("Network[?(@.Scope=='Management')].IP") 
-
-
-
     - name: Checking network manager status
       service:
         name: NetworkManager
@@ -78,6 +73,11 @@
       when: nfsi|length > 0
 
 
+    - set_fact:
+       nfsroutenet: "10.9.0.0/16"
+      when: nfsi|length > 0
+
+
     - set_fact: 
        bei: "{{ data[0] | json_query('Network[?(@.Scope==`BE`)].IP') }}"
 
@@ -112,6 +112,15 @@
       become: true
       become_method: sudo
 
+
+    - name: Checking DNS definitions
+      set_fact:
+        dns: "{{ data[0].Dns }}"
+
+
+    - name: Counting DNS for the configuration
+      set_fact:
+        dnscount: "{{ dns.split(',')|length }}"
 
 
 ###  BACKUP
@@ -335,12 +344,12 @@
         - bkp_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
 
 
-    - name: Restarting NetworkManager service
-      service:
-        name: NetworkManager
-        state: restarted
-      become: true
-      become_method: sudo
+#    - name: Restarting NetworkManager service
+#      service:
+#        name: NetworkManager
+#        state: restarted
+#      become: true
+#      become_method: sudo
 
 
     - name: Loading Production Aliases
@@ -350,6 +359,22 @@
       become: true
       become_method: sudo
       when: alias is defined
+
+
+    - name: Ping to Default Gateway
+      command: 'ping -c 3 -W 2 {{ data[0].Gateway }}'
+      register: ping
+      ignore_errors: true
+
+
+    - debug: 
+        msg: "Ping to Gateway Succeded"
+      when: '"from" in ping.stdout'
+
+
+    - debug: 
+        msg: "Ping to Gateway Failed" 
+      when: '"from" not in ping.stdout'
 
 
     - name: Updating /etc/hosts file
@@ -362,3 +387,11 @@
       become: true
       become_method: sudo
  
+
+    - name: Checking NFS Routes
+      set_fact: 
+        nfsnet: "{{ nfstmp | ipaddr('network') }}"
+
+
+    - debug: 
+        var: nfsnet

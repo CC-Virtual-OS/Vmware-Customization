@@ -1,9 +1,11 @@
 [
     {
         "Hostname": "cavia",
-        "Farm": "pluto",
-	"Cluster": "cluster-test",
+        "Farm": "paolo",
+	"Cluster": "paperino",
         "Gateway":  "10.14.35.1",
+	"Dns": "172.26.5.110,172.26.5.111,172.26.16.11,172.26.16.12",
+	"Routes": "0",
         "Network": [
             {
                 "MAC":"00:50:56:b6:c0:db",
@@ -20,7 +22,7 @@
                 "MASK": "255.255.255.224"
             },
             {
-                "MAC":"00:50:56:b6:19:0",
+                "MAC":"00:50:56:b6:19:0c",
                 "Vlan":"5 - 10.14.81.0/24 - BE WW TF",
                 "Scope": "NFS",
                 "IP": "1.2.3.4",
@@ -40,6 +42,8 @@
         "Farm": "pluto",
 	"Cluster": "cluster-test",
         "Gateway":  "10.14.81.1",
+	"Dns": "172.26.5.110,172.26.5.111,172.26.16.11,172.26.16.12",
+        "Routes": "0",
         "Network": [
             {
                 "MAC":"09:02:67:63:45",

@@ -288,6 +288,36 @@
         - pr_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
 
     
+    - name: "Loading Production Aliases - step 1/2"
+      command: "nmcli connection reload {{ pr_interface + '-SERVICE' }}"
+      become: true
+      become_method: sudo
+      when: alias is defined
+
+
+    - name: "Loading Production Aliases - step 2/2"
+      command: "nmcli connection up {{ pr_interface + '-SERVICE' }}"
+      become: true
+      become_method: sudo
+      when: alias is defined
+
+
+    - name: Ping to Default Gateway
+      command: 'ping -c 3 -W 2 {{ data[0].Gateway }}'
+      register: ping
+      ignore_errors: true
+
+
+    - debug: 
+        msg: "Ping to Gateway Succeded"
+      when: '"from" in ping.stdout'
+
+
+    - debug: 
+        msg: "Ping to Gateway Failed" 
+      when: '"from" not in ping.stdout'
+
+
     - name: Checking MANAGEMENT network configuration
       template:
         src: ../config/ifcfg-mgmt.j2
@@ -316,6 +346,22 @@
         - nfs_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
 
 
+    - name: Calculating NFS routing network
+      set_fact: 
+        nfsnet: "{{ nfstmp | ipaddr('network') }}"
+      when: 
+        - nfsi|length > 0
+        - nfs_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo 
+
+
+    - name: Calculating NFS Hostmin
+      set_fact:
+         nfsnetgw: "{{ nfsnet | ipmath(1) }}"
+      when:
+        - nfsi|length > 0
+        - nfs_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
     - name: Checking BE network configuration
       template:
         src: ../config/ifcfg-be.j2
@@ -330,10 +376,26 @@
         - be_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
 
 
-    - name: Checking BKP network configuration
+    - name: Calculating BE routing network
+      set_fact:
+        benet: "{{ betmp | ipaddr('network') }}"
+      when:
+        - bei|length > 0
+        - be_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - name: Calculating BE Hostmin
+      set_fact:
+        benetgw: "{{ benet | ipmath(1) }}"
+      when:
+        - bei|length > 0
+        - be_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - name: Checking BCK network configuration
       template:
-        src: ../config/ifcfg-bkp.j2
-        dest: "/etc/sysconfig/network-scripts/ifcfg-{{ be_interface + '-BKP' }}"
+        src: ../config/ifcfg-bck.j2
+        dest: "/etc/sysconfig/network-scripts/ifcfg-{{ bkp_interface + '-BCK' }}"
         owner: root
         group: root
         mode: '0644'
@@ -344,37 +406,118 @@
         - bkp_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
 
 
-#    - name: Restarting NetworkManager service
-#      service:
-#        name: NetworkManager
-#        state: restarted
-#      become: true
-#      become_method: sudo
+    - name: Calculating BCK routing network
+      set_fact:
+        bkpnet: "{{ bkptmp | ipaddr('network') }}"
+      when:
+        - bkpi|length > 0
+        - bkp_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
 
 
-    - name: Loading Production Aliases
-      command: |
-        nmcli connection reload "{{ pr_interface + '-SERVICE' }}"
-        nmcli connection up "{{ pr_interface + '-SERVICE' }}"
+    - name: Calculating BCK Hostmin
+      set_fact:
+        bkpnetgw: "{{ bkpnet | ipmath(1) }}"
+      when:
+        - bkpi|length > 0
+        - bkp_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
+
+
+    - name: Restarting NetworkManager service
+      service:
+        name: NetworkManager
+        state: restarted
       become: true
       become_method: sudo
-      when: alias is defined
 
 
-    - name: Ping to Default Gateway
-      command: 'ping -c 3 -W 2 {{ data[0].Gateway }}'
-      register: ping
-      ignore_errors: true
+    - name: Adding NFS Routes #Lo faccio dopo il restart del NetworkManager perchè altrimenti la connection da modificare non sarebbe esistente
+      command: "nmcli connection modify {{ nfs_interface }}-NFS +ipv4.routes '10.9.0.0/16 {{ nfsnetgw }}'"
+      become: true
+      become_method: sudo
+      when:
+        - nfsi|length > 0
+        - nfs_interface is defined #Verifico che ci sia riscontro con il MAC ADDRESS previsto altrimenti skippo
 
 
-    - debug: 
-        msg: "Ping to Gateway Succeded"
-      when: '"from" in ping.stdout'
+    - name: "Adding BE Routes - step 1/3"  #Lo faccio dopo il restart del NetworkManager perchè altrimenti la connection da modificare non sarebbe esistente
+      command: "nmcli connection modify {{ be_interface }}-BE +ipv4.routes '10.0.0.0/8 {{ benetgw }}'"
+      become: true
+      become_method: sudo
+      when:
+        - bei|length > 0
+        - be_interface is defined
+        - "{{ data[0].Routes == '1' }}" #Solo se il flag RFC è settato
 
 
-    - debug: 
-        msg: "Ping to Gateway Failed" 
-      when: '"from" not in ping.stdout'
+    - name: "Adding BE Routes - step 2/3"  #Lo faccio dopo il restart del NetworkManager perchè altrimenti la connection da modificare non sarebbe esistente
+      command: "nmcli connection modify {{ be_interface }}-BE +ipv4.routes '172.16.0.0/12 {{ benetgw }}'"
+      become: true
+      become_method: sudo
+      when:
+        - bei|length > 0
+        - be_interface is defined
+        - "{{ data[0].Routes == '1' }}" #Solo se il flag RFC è settato
+
+
+    - name: "Adding BE Routes - step 3/3"  #Lo faccio dopo il restart del NetworkManager perchè altrimenti la connection da modificare non sarebbe esistente
+      command: "nmcli connection modify {{ be_interface }}-BE +ipv4.routes '192.168.0.0/16 {{ benetgw }}'"
+      become: true
+      become_method: sudo
+      when:
+        - bei|length > 0
+        - be_interface is defined
+        - "{{ data[0].Routes == '1' }}" #Solo se il flag RFC è settato
+
+
+    - name: "Adding BCK Routes - step 1/1" 
+      command: "nmcli connection modify {{ bkp_interface }}-BCK +ipv4.routes '10.9.33.0/24 {{ bkpnetgw }}'"
+      become: true
+      become_method: sudo
+      when:
+        - bkpi|length > 0
+        - bkp_interface is defined
+
+
+    - name: "Checking BCK first extra gateway"
+      set_fact:
+        bkpgwextra1: "10.3.2.10"
+      when:
+        - bkpi|length > 0
+        - bkp_interface is defined
+        - bkpnet == '10.3.2.0'
+        - nmclibkpmask == '24'
+
+
+    - name: "Checking BCK second extra gateway"
+      set_fact:
+        bkpgwextra2: "10.4.96.2"
+      when:
+        - bkpi|length > 0
+        - bkp_interface is defined
+        - bkpnet == '10.4.96.0'
+        - nmclibkpmask == '23'
+
+
+    - name: "Adding BCK Extra Routes - step 1/2"
+      command: "nmcli connection modify {{ bkp_interface }}-BCK +ipv4.routes '10.9.1.60/32 {{ bkpgwextra1 }}'"   
+      become: true
+      become_method: sudo
+      when:
+        - bkpi|length > 0
+        - bkp_interface is defined
+        - bkpnet == '10.3.2.0'
+        - nmclibkpmask == '24'
+
+
+    - name: "Adding BCK Extra Routes - step 2/2"
+      command: "nmcli connection modify {{ bkp_interface }}-BCK +ipv4.routes '10.9.1.60/32 {{ bkpgwextra2 }}'"   
+      become: true
+      become_method: sudo
+      when:
+        - bkpi|length > 0
+        - bkp_interface is defined
+        - bkpnet == '10.4.96.0'
+        - nmclibkpmask == '23'
 
 
     - name: Updating /etc/hosts file
@@ -388,10 +531,4 @@
       become_method: sudo
  
 
-    - name: Checking NFS Routes
-      set_fact: 
-        nfsnet: "{{ nfstmp | ipaddr('network') }}"
 
-
-    - debug: 
-        var: nfsnet

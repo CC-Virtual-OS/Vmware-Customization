@@ -1,0 +1,66 @@
+---
+- name: "Phase 4 : Filesystem Configuration"
+  hosts: just_parsed
+  vars:
+    ansible_ssh_user: administrator
+    ansible_ssh_pass: C4mb14m1!
+    ansible_become_pass: C4mb14m1!
+    data: "{{ lookup('file', '../data/data.json') }}"
+  gather_facts: true
+  tasks:
+    
+
+    - set_fact:
+        disklen: "{{ data[0].Disk | length }}"
+
+
+    - debug:
+        msg: "disklen length is {{ disklen }}"
+
+
+#    - debug:
+#        var: data[0].Disk[{{ item }}].DiskFs 
+#      with_sequence: start=0 end={{ disklen|int -1 }}
+
+
+    - name: Clearing any existing mountpoint 
+      file:
+        path: "{{ data[0].Disk[item | int() ].DiskFs }}"
+        state: absent
+      with_sequence: start=0 end={{ disklen|int -1 }}
+      become: true
+      become_method: sudo
+
+
+    - name: Creating new mountpoint
+      file:
+        path: "{{ data[0].Disk[item | int() ].DiskFs }}"
+        state: directory
+        mode: '0755'
+      with_sequence: start=0 end={{ disklen|int -1 }}
+      become: true
+      become_method: sudo
+
+
+    - name: Checking scsi ID 1/2
+      shell: /lib/udev/scsi_id --whitelisted --device=/dev/sda
+      become: true
+      become_method: sudo
+      register: scsiout
+
+
+# Da Conservare #
+#    - debug:
+#        msg: "scsiout vale {{ scsiout.stdout }}"
+#      when: scsiout.stdout != ""
+#
+
+    - name: Collecting mapped disks
+      set_fact:
+        localdisks: "{{ ansible_devices.keys() | select('match','sd+') | list }}"
+
+
+    - debug:
+        var: localdisks
+
+

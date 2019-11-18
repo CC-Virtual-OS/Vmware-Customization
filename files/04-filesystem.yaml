@@ -64,3 +64,41 @@
         var: localdisks
 
 
+    - debug:
+         msg: "{{ item.0.dev | regex_replace ('^/','') | regex_replace ('/','-') }} mounted to device {{ item.1.dev }}"
+       loop: "{{ data[0].Disk|
+             json_query('[].{dev: DiskFs, id: ID}')|
+             product(
+             ansible_facts.devices|dict2items|
+             json_query('[].{dev: key, ids: value.links.ids}'))|
+             list }}"
+       when: item.1.ids|map('search', item.0.id) is any
+
+
+
+#    - debug:
+#        var: item
+#      loop: "{{ data[0].Disk| json_query('[].{dev: DiskFs, id: ID}') }}"
+#
+#    - debug:
+#        var: item
+#      loop: "{{ ansible_facts.devices|dict2items|json_query('[].{dev: key, ids: value.links.ids}') }}"
+#
+
+
+     - name: Creating partitions
+       parted:
+         device: "/dev/{{ item.1.dev }}"       
+         number: 1
+         flags: [ lvm ]
+         label: msdos
+         state: present
+       become: true
+       become_method: sudo
+       loop: "{{ data[0].Disk|
+             json_query('[].{dev: DiskFs, id: ID}')|
+             product(
+             ansible_facts.devices|dict2items|
+             json_query('[].{dev: key, ids: value.links.ids}'))|
+             list }}"
+       when: item.1.ids|map('search', item.0.id) is any

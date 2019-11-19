@@ -9,12 +9,9 @@ Currently the customization playbook handles:
 4) *New* Filesystem on top of disks mapping via scsi_id, both from command line and facts
 5) For the above filesystems, the ratio is 1:1 against the disk. It manage ext4/xfs
 6) Network File System
-
-
-
-
-
-
+  
+  
+  
 ROADMAP:  
 1.0 = First Release and testing  
 2.0 = Rollback incomplete tasks in case of failure  

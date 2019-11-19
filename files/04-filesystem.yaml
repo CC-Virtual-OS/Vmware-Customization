@@ -1,0 +1,250 @@
+---
+- name: "Phase 4 : Filesystem Configuration"
+  hosts: just_parsed
+  vars:
+    ansible_ssh_user: administrator
+    ansible_ssh_pass: C4mb14m1!
+    ansible_become_pass: C4mb14m1!
+    data: "{{ lookup('file', '../data/data.json') }}"
+  gather_facts: true
+  tasks:
+ 
+
+    - set_fact:
+        disklen: "{{ data[0].Disk | length }}"
+
+    - name: Getting major release version
+      set_fact:
+        rel: "{{ hostvars[inventory_hostname].ansible_distribution_major_version }}"
+
+
+#    - debug:
+#        var: data[0].Disk[{{ item }}].DiskFs 
+#      with_sequence: start=0 end={{ disklen|int -1 }}
+
+
+    - name: Clearing any existing mountpoint 
+      file:
+        path: "{{ data[0].Disk[item | int() ].DiskFs }}"
+        state: absent
+      when: data[0].Disk[item | int() ].Scope =='New'
+      with_sequence: start=0 end={{ disklen|int -1 }}
+      become: true
+      become_method: sudo
+
+
+    - name: Creating new mountpoint
+      file:
+        path: "{{ data[0].Disk[item | int() ].DiskFs }}"
+        state: directory
+        mode: '0755'
+      when: data[0].Disk[item | int() ].Scope =='New'
+      with_sequence: start=0 end={{ disklen|int -1 }}
+      become: true
+      become_method: sudo
+
+
+    - name: Checking scsi id in VMX file
+      shell: /lib/udev/scsi_id --whitelisted --device=/dev/sda
+      ignore_errors: true
+      become: true
+      become_method: sudo
+      register: scsiout
+
+
+    - fail:
+        msg: "This system requires scsi ID parameter on VMX file!!!"
+      when: scsiout is failed
+
+
+# Da Conservare #
+#    - debug:
+#        msg: "scsiout vale {{ scsiout.stdout }}"
+#      when: scsiout.stdout != ""
+#
+#
+#    - name: Collecting mapped disks
+#      set_fact:
+#        localdisks: "{{ ansible_devices.keys() | select('match','sd+') | list }}"
+#      when: scsiout.stdout != ""
+
+#stampo i dischi trovati
+#    - debug:
+#        var: localdisks
+################
+
+#
+#    - debug:
+#####tenere per sintassi regex_replace  msg: "{{ item.0.dev | regex_replace ('^/','') | regex_replace ('/','-') | basename }} mounted to device {{ item.1.dev }}"
+#         msg: "{{ item.0.dev | basename }} mounted to device {{ item.1.dev }} with test {{ item.0.scope }}"
+#      loop: "{{ data[0].Disk|
+#            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+#            product(
+#            ansible_facts.devices|dict2items|
+#            json_query('[].{dev: key, ids: value.links.ids }'))|
+#            list }}"
+#      when: 
+#        - item.1.ids|map('search', item.0.id) is any
+#        - item.0.scope == "New"
+
+
+
+#    - debug:
+#        var: item
+#      loop: "{{ data[0].Disk| json_query('[].{dev: DiskFs, id: ID}') }}"
+#
+#    - debug:
+#        var: item
+#      loop: "{{ ansible_facts.devices|dict2items|json_query('[].{dev: key, ids: value.links.ids}') }}"
+#
+
+
+    - name: Creating local partitions
+      parted:
+        device: "/dev/{{ item.1.dev }}"       
+        number: 1
+        flags: [ lvm ]
+        label: msdos
+        state: present
+      become: true
+      become_method: sudo
+      loop: "{{ data[0].Disk|
+            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+            product(
+            ansible_facts.devices|dict2items|
+            json_query('[].{dev: key, ids: value.links.ids}'))|
+            list }}"
+      when: 
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "New"
+
+
+    - name: Creating volume groups
+      lvg:
+        vg: "{{ item.0.dev | basename }}-vg"
+        pvs: "/dev/{{ item.1.dev }}1"
+      become: true
+      become_method: sudo
+      loop: "{{ data[0].Disk|
+      json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+            product(
+            ansible_facts.devices|dict2items|
+            json_query('[].{dev: key, ids: value.links.ids}'))|
+            list }}"
+      when: 
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "New"
+
+
+    - name: Creating logical volumes
+      lvol:
+        vg: "{{ item.0.dev | basename }}-vg"
+        lv: "{{ item.0.dev | basename }}-vol"
+        size: 100%FREE
+      become: true
+      become_method: sudo
+      loop: "{{ data[0].Disk|
+            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+            product(
+            ansible_facts.devices|dict2items|
+            json_query('[].{dev: key, ids: value.links.ids}'))|
+            list }}"
+      when:
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "New"
+         
+
+    - set_fact:
+        fs: "xfs"
+      when: rel == "7"
+
+
+    - set_fact:
+        fs: "ext4"
+      when: rel == "6"
+
+
+    - name: Creating local filesystems
+      filesystem:
+        fstype: "{{ fs }}"  
+        dev: "/dev/{{ item.0.dev | basename }}-vg/{{ item.0.dev | basename }}-vol"
+      become: true
+      become_method: sudo
+      loop: "{{ data[0].Disk|
+            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+            product(
+            ansible_facts.devices|dict2items|
+            json_query('[].{dev: key, ids: value.links.ids}'))|
+            list }}"
+      when: 
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "New"
+
+
+    - name: Mounting local filesystems
+      mount:
+        path: "{{ item.0.dev }}"
+        src: "/dev/{{ item.0.dev | basename }}-vg/{{ item.0.dev | basename }}-vol"
+        fstype: "{{ fs }}"
+        state: mounted
+      become: true
+      become_method: sudo
+      loop: "{{ data[0].Disk|
+            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+            product(
+            ansible_facts.devices|dict2items|
+            json_query('[].{dev: key, ids: value.links.ids}'))|
+            list }}"
+      when: 
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "New"
+
+   
+    - name: Stampa di prova
+      debug:
+        msg: "NFS share splittata per IP vale {{ data[0].Disk[item | int() ].Share.split(':')[0]  }}"
+      when: data[0].Disk[item | int() ].Scope =='NFS'
+      with_sequence: start=0 end={{ disklen|int -1 }}
+
+
+    - name: "Verifying NFS connectivity for port 2049 - step 1/2"
+      wait_for:
+        host: "{{ data[0].Disk[item | int() ].Share.split(':')[0] }}"
+        port: 2049
+        state: started
+        delay: 0
+        timeout: 3
+      ignore_errors: true
+      with_sequence: start=0 end={{ disklen|int -1 }}
+      when: data[0].Disk[item | int() ].Scope =='NFS'
+      register: nfsa
+
+
+    - name: "Verifying NFS connectivity for port 111 - step 2/2"
+      wait_for:
+        host: "{{ data[0].Disk[item | int() ].Share.split(':')[0] }}"
+        port: 111
+        state: started
+        delay: 0
+        timeout: 3
+      ignore_errors: true
+      with_sequence: start=0 end={{ disklen|int -1 }}
+      when: data[0].Disk[item | int() ].Scope =='NFS'
+      register: nfsb
+
+
+    - name: "Mounting Network file systems"
+      mount:
+        path: "{{ data[0].Disk[item | int() ].DiskFs }}"
+        src: "{{ data[0].Disk[item | int() ].Share }}"
+        fstype: nfs
+        state: present
+      become: true
+      become_method: sudo
+      with_sequence: start=0 end={{ disklen|int -1 }}
+      when:
+        - data[0].Disk[item | int() ].Scope =='NFS'
+        - nfsa is success
+        - nfsb is success
+
+

@@ -16,6 +16,6 @@ Currently the customization playbook handles:
 
 
 ROADMAP:
-1.0 = First Release and testing
+1.0 = First Release and testing\n
 2.0 = Rollback incomplete tasks in case of failure
 3.0 = Handles multiple systems in a single JSON file

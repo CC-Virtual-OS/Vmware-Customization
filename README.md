@@ -10,7 +10,7 @@ Currently the customization playbook handles:
 5) For the above filesystems, the ratio is 1:1 against the disk. It manages ext4/xfs
 6) Network File System
   
-  
+&bnsp;  
   
 ROADMAP:  
 1.0 = First Release and testing  

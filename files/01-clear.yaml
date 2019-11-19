@@ -5,7 +5,7 @@
     ansible_ssh_user: administrator
     ansible_ssh_pass: C4mb14m1!
     ansible_become_pass: C4mb14m1!
-    data: "{{ lookup('file', '../json/data.json') }}"
+    data: "{{ lookup('file', '../data/data.json') }}"
   gather_facts: false
   tasks:
 

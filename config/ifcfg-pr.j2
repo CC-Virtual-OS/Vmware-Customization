@@ -1,0 +1,22 @@
+TYPE=Ethernet
+{% if alias is defined %}
+{%   for i in range( aliaslt|int ) %}
+IPADDR{{ i }}={{ pri[0].split(',')[i] }} 
+PREFIX{{ i }}={{ nmcliprmask }}
+{%   endfor %}
+GATEWAY0={{ data[0].Gateway }}
+{% endif %}
+{% if alias is not defined %}
+IPADDR={{ erog }}
+PREFIX={{ nmcliprmask }}
+GATEWAY={{ data[0].Gateway }}
+{% endif %}
+{% for j in range( dnscount|int -1 ) %}
+DNS{{ j+1 }}={{ data[0].Dns.split(',')[j] }}
+{% endfor %}
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=no
+NAME={{ pr_interface }}-SERVICE
+DEVICE={{ pr_interface }}
+ONBOOT=yes

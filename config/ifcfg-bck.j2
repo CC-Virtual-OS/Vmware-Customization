@@ -1,0 +1,8 @@
+TYPE=Ethernet
+IPADDR={{ bkpi[0] }}
+PREFIX={{ nmclibkpmask }}
+IPV4_FAILURE_FATAL=no
+IPV6INIT=no
+NAME={{ bkp_interface }}-BCK
+DEVICE={{ bkp_interface }}
+ONBOOT=yes

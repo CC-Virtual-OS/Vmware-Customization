@@ -56,6 +56,12 @@
 		"DiskFs": "/alex"
             },
 	    {
+		"ID": "36000c29cc8b4771df1c23ac574c84b83",
+		"Scope": "Resize",
+		"Share": "",
+		"DiskFs": "/pippo"
+            },
+	    {
 		"ID": "0",
 		"Scope": "NF",
 		"Share": "5.6.7.8:/paoletto",

@@ -93,10 +93,10 @@
 #        var: item
 #      loop: "{{ data[0].Disk| json_query('[].{dev: DiskFs, id: ID}') }}"
 #
-#    - debug:
-#        var: item
-#      loop: "{{ ansible_facts.devices|dict2items|json_query('[].{dev: key, ids: value.links.ids}') }}"
-#
+    - debug:
+        var: item
+      loop: "{{ ansible_facts.devices|dict2items|json_query('[].{dev: key, ids: value.links.ids}') }}"
+
 
 
     - name: Creating local partitions
@@ -247,4 +247,45 @@
         - nfsa is success
         - nfsb is success
 
+
+#    - name: print di test
+#      debug:
+#        msg: "{{ ansible_mounts }}"
+
+
+
+
+#####tenere per sintassi regex_replace  msg: "{{ item.0.dev | regex_replace ('^/','') | regex_replace ('/','-') | basename }} mounted to device {{ item.1.dev }}"
+#         msg: "{{ item.0.dev | basename }} mounted to device {{ item.1.dev }} with test {{ item.0.scope }}"
+#      loop: "{{ data[0].Disk|
+#            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+#            product(
+#            ansible_facts.devices|dict2items|
+#            json_query('[].{dev: key, ids: value.links.ids }'))|
+#            list }}"
+#      when: 
+#        - item.1.ids|map('search', item.0.id) is any
+#        - item.0.scope == "New"
+
+#
+#    - debug:
+#        var: item
+#      loop: "{{ ansible_mounts|
+#             json_query('[].{dev: device, mnt: mount}') }}"
+
+## questo debug di sotto funziona e stampa:
+#TASK [debug] ********************************************************************************************************************************************************************************************************************************
+#skipping: [10.14.35.9] => (item=[{'scope': u'Resize', 'id': u'36000c29896572dfd709b7d0e998a2ebe', 'dev': u'/ltm/data/ciaone'}, {'mnt': u'/var', 'dev': u'/dev/mapper/vgvar-lvvar'}])
+#ok: [10.14.35.9] => (item=[{'scope': u'Resize', 'id': u'36000c29896572dfd709b7d0e998a2ebe', 'dev': u'/ltm/data/ciaone'}, {'mnt': u'/ltm/data/ciaone', 'dev': u'/dev/mapper/ciaone--vg-ciaone--vol'}]) => {
+#    "msg": "item0dev vale /ltm/data/ciaone e item1dev vale /dev/mapper/ciaone--vg-ciaone--vol"
+#}
+#
+    - debug:
+        msg: "item0dev vale {{ item.0.dev }} e ID vale {{ ansible_facts.devices|json_query }}"
+      loop: "{{ data[0].Disk|
+            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
+            product( ansible_mounts|json_query('[].{dev: device, mnt: mount}'))|list }}"
+      when:
+        - item.0.dev == item.1.mnt
+        - item.0.scope == "Resize"
 

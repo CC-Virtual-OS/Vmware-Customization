@@ -44,6 +44,7 @@
 #- import_playbook: files/01-clear.yaml
 #- import_playbook: files/02-network.yaml
 #- import_playbook: files/03-services.yaml
-- import_playbook: files/04-filesystem.yaml
+#- import_playbook: files/04-filesystem.yaml
+- import_playbook: files/05-prova.yaml
 
 

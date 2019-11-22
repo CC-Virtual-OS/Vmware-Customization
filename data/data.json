@@ -5,13 +5,14 @@
 	"Cluster": "paperino",
         "Gateway":  "10.14.35.1",
 	"Dns": "172.26.5.110,172.26.5.111,172.26.16.11,172.26.16.12",
+	"Timezone": "EDT",
 	"Routes": "0",
         "Network": [
             {
                 "MAC":"00:50:56:b6:c0:db",
                 "Vlan":"107 - 10.14.8.0/24 - BE WW TF",
                 "Scope": "Production",
-                "IP": "10.14.35.9",
+                "IP": "10.14.35.9,10.14.35.8",
                 "MASK": "255.255.255.224"
             },
             {
@@ -38,10 +39,10 @@
         ],   
         "Disk": [
             {
-		"ID": "36000c29896572dfd709b7d0e998a2ebe",
+		"ID": "36000c29cc8b4771df1c23ac574c84b83",
 		"Scope": "Resize",
 		"Share": "",
-		"DiskFs": "/ltm/data/ciaone"
+		"DiskFs": "/new_ltm"
             },
             {
 		"ID": "36000c29ccb2f18976786181535e86553",
@@ -57,7 +58,7 @@
             },
 	    {
 		"ID": "36000c29cc8b4771df1c23ac574c84b83",
-		"Scope": "Resize",
+		"Scope": "Resiz",
 		"Share": "",
 		"DiskFs": "/pippo"
             },

@@ -93,10 +93,6 @@
 #        var: item
 #      loop: "{{ data[0].Disk| json_query('[].{dev: DiskFs, id: ID}') }}"
 #
-    - debug:
-        var: item
-      loop: "{{ ansible_facts.devices|dict2items|json_query('[].{dev: key, ids: value.links.ids}') }}"
-
 
 
     - name: Creating local partitions
@@ -248,13 +244,6 @@
         - nfsb is success
 
 
-#    - name: print di test
-#      debug:
-#        msg: "{{ ansible_mounts }}"
-
-
-
-
 #####tenere per sintassi regex_replace  msg: "{{ item.0.dev | regex_replace ('^/','') | regex_replace ('/','-') | basename }} mounted to device {{ item.1.dev }}"
 #         msg: "{{ item.0.dev | basename }} mounted to device {{ item.1.dev }} with test {{ item.0.scope }}"
 #      loop: "{{ data[0].Disk|
@@ -280,12 +269,84 @@
 #    "msg": "item0dev vale /ltm/data/ciaone e item1dev vale /dev/mapper/ciaone--vg-ciaone--vol"
 #}
 #
-    - debug:
-        msg: "item0dev vale {{ item.0.dev }} e ID vale {{ ansible_facts.devices|json_query }}"
-      loop: "{{ data[0].Disk|
-            json_query('[].{dev: DiskFs, id: ID, scope: Scope}')|
-            product( ansible_mounts|json_query('[].{dev: device, mnt: mount}'))|list }}"
+
+
+    - set_fact:
+        list_fs: "{{ data.0.Disk|
+                     json_query('[].{dev: DiskFs,
+                                     id: ID,
+                                     scope: Scope}') }}"
+
+
+#    - debug:
+#        var: list_fs
+
+
+    - set_fact:
+        list_disk: "{{ ansible_facts.devices|
+                       dict2items|
+                       json_query('[].{dev: key,
+                                       ids: value.links.ids}') }}"
+
+
+#    - debug:
+#        var: list_disk
+#
+#
+#    - debug:
+#        msg: "{{ item.0.dev }} mounted to device
+#              {{ item.1.dev }} scope
+#              {{ item.0.scope }}"
+#      loop: "{{ list_fs|product(list_disk)|list }}"
+#      when:
+#        - item.1.ids|map('search', item.0.id) is any
+#        - item.0.scope == "Resize"
+#      #output: msg": "/ltm/data/ciaone mounted to device sde scope Resize"
+
+
+    - name: "Resizing: creating partitions - step 1/4"
+      parted:
+        device: "/dev/{{ item.1.dev }}"
+        number: 1
+        flags: [ lvm ]
+        label: msdos
+        state: present
+      become: true
+      become_method: sudo
+      loop: "{{ list_fs|product(list_disk)|list }}"
       when:
-        - item.0.dev == item.1.mnt
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "Resize"
+
+
+    - name: "Resizing: creating physical volumes - step 2/4"
+      shell: "pvcreate /dev/{{ item.1.dev }}1"
+      become: true
+      become_method: sudo
+      loop: "{{ list_fs|product(list_disk)|list }}"
+      when:
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "Resize"
+
+
+    - name: "Resizing: expanding volume groups - step 3/4"
+      shell: "vgextend $(lvs -o lv_all | grep $(df -h | grep {{ item.0.dev }} | awk '{ print $1 }') | awk '{ print $4 }' | cut -f 3 -d '/') /dev/{{ item.1.dev }}1"
+      become: true
+      become_method: sudo
+      ignore_errors: true
+      loop: "{{ list_fs|product(list_disk)|list }}"
+      when:
+        - item.1.ids|map('search', item.0.id) is any
+        - item.0.scope == "Resize"
+
+
+    - name: "Resizing: growing the filesystem - step 4/4"
+      shell: "lvresize -r -l +100%free $(df -h | grep {{ item.0.dev }} | awk '{ print $1 }')" 
+      become: true
+      become_method: sudo
+      ignore_errors: true
+      loop: "{{ list_fs|product(list_disk)|list }}"
+      when:
+        - item.1.ids|map('search', item.0.id) is any
         - item.0.scope == "Resize"
 

@@ -39,3 +39,18 @@
       become: true
       become_method: sudo
 
+
+    - set_fact:
+        tmptz: "{{ data[0].Timezone }}"
+
+
+    - set_fact:
+        tmptz: "America/Barbados"
+      when: data[0].Timezone == "EDT"
+
+
+    - name: Setting Timezone
+      timezone:
+        name: "{{ tmptz }}"
+      become: true
+      become_method: sudo

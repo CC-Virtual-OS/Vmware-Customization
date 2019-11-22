@@ -167,6 +167,8 @@
       when:
         - (hostvars[inventory_hostname]['ansible_%s' % item]|default({})).get('macaddress') == "{{ mgimac[0] }}" 
         - mgi|length > 0 
+        - mgimac is defined
+        - mg_interface is defined
       with_items: "{{ ansible_interfaces }}"
       ignore_errors: true
 
